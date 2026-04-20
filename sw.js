@@ -1,6 +1,6 @@
 const CACHE_NAME = 'balance-pro-v1';
 const ASSETS = [
-  './ADMINISTRACION_GENERAL_1.4.html',
+  './index.html',
   './manifest.json'
 ];
 
