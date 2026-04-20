@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BALANCE</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: #1e293b; -webkit-tap-highlight-color: transparent; }
+        
+        .sidebar { transition: all 0.3s ease; }
+        @media (max-width: 1024px) {
+            .sidebar { position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; flex-direction: row !important; z-index: 50; border-top: 1px solid #e2e8f0; }
+            .sidebar-item { flex-direction: column; font-size: 10px; padding: 8px !important; gap: 4px !important; flex: 1; justify-content: center; }
+            .sidebar-item span:first-child { font-size: 18px; }
+            .main-content { padding-bottom: 90px !important; }
+            .hide-mobile { display: none; }
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .sidebar-item.active { background-color: #eff6ff; color: var(--primary); border-right: 4px solid var(--primary); }
+        @media (max-width: 1024px) { .sidebar-item.active { border-right: none; border-top: 4px solid var(--primary); } }
+
+        .card { background: white; border-radius: 1.25rem; box-shadow: 0 4px 12px -2px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        .input-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+        
+        input, select { border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.7rem; width: 100%; font-weight: 600; outline: none; transition: border 0.2s; font-size: 0.95rem; background: white; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        
+        .btn-primary { background: var(--primary); color: white; font-weight: 800; padding: 1rem; border-radius: 1rem; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s; }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; }
+    </style>
+</head>
+<body class="flex flex-col lg:flex-row h-screen overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar w-full lg:w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div class="p-6 hide-mobile">
+            <h1 class="text-2xl font-black italic text-blue-700 tracking-tighter">BALANCE PRO</h1>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">v1.2.5 Master SFA</p>
+        </div>
+        <nav class="flex-1 flex lg:flex-col gap-1 px-2 lg:px-4 overflow-x-auto">
+            <button onclick="showTab('tab-ingresos')" class="sidebar-item active flex items-center gap-3 p-3 rounded-xl font-bold transition">
+                <span>🛠️</span> <span class="hide-mobile">Trabajos</span>
+            </button>
+            <button onclick="showTab('tab-extra')" class="sidebar-item flex items-center gap-3 p-3 rounded-xl font-bold transition">
+                <span>💰</span> <span class="hide-mobile">Extra</span>
+            </button>
+            <button onclick="showTab('tab-gastos')" class="sidebar-item flex items-center gap-3 p-3 rounded-xl font-bold transition">
+                <span>🛒</span> <span class="hide-mobile">Gastos</span>
+            </button>
+            <button onclick="showTab('tab-deudas')" class="sidebar-item flex items-center gap-3 p-3 rounded-xl font-bold transition">
+                <span>📄</span> <span class="hide-mobile">Caja / CC</span>
+            </button>
+            <button onclick="showTab('tab-ahorro')" class="sidebar-item flex items-center gap-3 p-3 rounded-xl font-bold transition">
+                <span>🏦</span> <span class="hide-mobile">Ahorro</span>
+            </button>
+            <button onclick="showTab('tab-balance')" class="sidebar-item flex items-center gap-3 p-3 rounded-xl font-bold transition">
+                <span>📈</span> <span class="hide-mobile">Balance</span>
+            </button>
+            <button onclick="showTab('tab-config')" class="sidebar-item flex items-center gap-3 p-3 rounded-xl font-bold transition">
+                <span>⚙️</span> <span class="hide-mobile">Config</span>
+            </button>
+        </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content flex-1 overflow-y-auto p-4 lg:p-8 relative">
+        <header class="flex justify-between items-center mb-6">
+            <h2 id="view-title" class="text-xl lg:text-3xl font-black text-slate-800 tracking-tight">Registro de Trabajos</h2>
+            <div class="flex bg-slate-200 p-1 rounded-xl shadow-inner">
+                <button id="v-month" onclick="setViewMode('month')" class="px-4 py-1.5 rounded-lg font-bold text-xs transition">MES</button>
+                <button id="v-year" onclick="setViewMode('year')" class="px-4 py-1.5 rounded-lg font-bold text-xs transition text-slate-500">AÑO</button>
+            </div>
+        </header>
+
+        <!-- VISTA: TRABAJOS -->
+        <section id="tab-ingresos" class="tab-content active">
+            <div class="card p-4 lg:p-8 mb-8">
+                <form id="form-ingreso" onsubmit="saveIngreso(event)">
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div class="col-span-2 lg:col-span-1">
+                            <label class="input-label">Fecha Trabajo</label>
+                            <input type="date" id="ing-fecha" required>
+                        </div>
+                        <div class="col-span-2 lg:col-span-2">
+                            <label class="input-label">Cliente</label>
+                            <input type="text" id="ing-cliente" required placeholder="Nombre del cliente">
+                        </div>
+                        <div class="col-span-2 lg:col-span-1">
+                            <label class="input-label">Rubro</label>
+                            <select id="ing-rubro" class="cfg-rubros-sync"></select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <label class="input-label">Monto Bruto ($)</label>
+                            <input type="text" id="ing-bruto" required placeholder="0" class="text-blue-600 font-black text-lg" oninput="formatInput(this); updateSaldo();">
+                        </div>
+                        <div>
+                            <label class="input-label">Materiales ($)</label>
+                            <input type="text" id="ing-materiales" placeholder="0" oninput="formatInput(this)">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="input-label">Régimen</label>
+                            <select id="ing-regimen">
+                                <option value="monotributo">Monotributo</option>
+                                <option value="srl">SRL / Inscripto</option>
+                                <option value="negro">Efectivo / Negro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 p-4 lg:p-6 rounded-2xl border-2 border-dashed border-blue-200 mb-6">
+                        <div class="flex flex-wrap items-center gap-4 mb-6">
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" id="chk-pago-momento" class="w-6 h-6 rounded-lg accent-blue-600" onchange="togglePagoInmediato()">
+                                <span class="font-black text-blue-900 uppercase text-sm tracking-tighter">¿Pagó todo hoy?</span>
+                            </label>
+                            <div id="panel-plan-config" class="flex flex-wrap items-end gap-3">
+                                <div>
+                                    <label class="input-label">Adelanto ($)</label>
+                                    <input type="text" id="ing-adelanto" class="w-32" placeholder="0" oninput="formatInput(this); updateSaldo();">
+                                </div>
+                                <div>
+                                    <label class="input-label">Fecha 1° Pago</label>
+                                    <input type="date" id="gen-fecha-inicio" class="w-40 text-xs">
+                                </div>
+                                <div>
+                                    <label class="input-label">Cuotas</label>
+                                    <input type="number" id="gen-cant" class="w-20" min="1" value="1">
+                                </div>
+                                <div>
+                                    <label class="input-label">Tipo</label>
+                                    <select id="gen-tipo" class="w-32">
+                                        <option value="transferencia">Transf.</option>
+                                        <option value="cheque">Cheque</option>
+                                        <option value="efectivo">Efectivo</option>
+                                    </select>
+                                </div>
+                                <button type="button" onclick="generarPlan()" class="bg-blue-600 text-white font-black px-4 py-3 rounded-xl text-xs">GENERAR PLAN</button>
+                            </div>
+                        </div>
+                        <div id="lista-cobros-temp" class="space-y-2"></div>
+                    </div>
+
+                    <div class="flex flex-col lg:flex-row justify-between items-center gap-4 border-t pt-6">
+                        <div id="validator-msg" class="text-xs font-bold px-4 py-2 rounded-full"></div>
+                        <button type="submit" id="btn-save-trabajo" class="btn-primary w-full lg:w-auto px-12">Guardar Trabajo</button>
+                    </div>
+                </form>
+            </div>
+		<div class="mt-10 pt-6 border-t border-gray-200">
+		<h3 class="text-lg font-bold mb-4 text-blue-800">Historial Reciente de Trabajos</h3>
+		<div id="lista-ingresos-local" class="space-y-3"></div>
+	    </div>
+        </section>
+
+        <!-- VISTA: CAJA Y DEUDAS -->
+        <section id="tab-deudas" class="tab-content">
+            <div class="mb-10">
+                <h3 class="font-black text-slate-400 text-xs mb-4 uppercase tracking-widest">Cobros Pendientes (Cuentas Corrientes)</h3>
+                <div id="contenedor-pendientes" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
+            </div>
+
+            <div class="mt-12">
+                <h3 class="font-black text-slate-400 text-xs mb-4 uppercase tracking-widest">Historial de Cobros y Cheques Recibidos</h3>
+                <div class="card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left min-w-[600px]">
+                            <thead class="bg-slate-50 border-b">
+                                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    <th class="p-4">Fecha Cobro</th>
+                                    <th class="p-4">Cliente / Concepto</th>
+                                    <th class="p-4">Método</th>
+                                    <th class="p-4">N° Cheque</th>
+                                    <th class="p-4 text-right">Monto</th>
+                                    <th class="p-4 text-center">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="body-historial-cobros"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISTA: BALANCE -->
+        <section id="tab-balance" class="tab-content">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="card p-4 border-l-8 border-emerald-500">
+                    <p class="input-label">Ingresos Reales</p>
+                    <h3 id="kpi-cobrado" class="text-lg lg:text-2xl font-black text-slate-800">$ 0</h3>
+                </div>
+                <div class="card p-4 border-l-8 border-red-500">
+                    <p class="input-label">Gastos Totales</p>
+                    <h3 id="kpi-gastos" class="text-lg lg:text-2xl font-black text-slate-800">$ 0</h3>
+                </div>
+                <div class="card p-4 border-l-8 border-orange-500">
+                    <p class="input-label">Impuestos Est.</p>
+                    <h3 id="kpi-impuestos" class="text-lg lg:text-2xl font-black text-slate-800">$ 0</h3>
+                </div>
+                <div class="card p-4 bg-blue-600 text-white shadow-xl shadow-blue-200">
+                    <p class="text-[10px] font-bold uppercase opacity-80">Utilidad Neta</p>
+                    <h3 id="kpi-utilidad" class="text-lg lg:text-2xl font-black">$ 0</h3>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card p-6 flex flex-col items-center">
+                    <canvas id="mainChart"></canvas>
+                </div>
+                <div class="card p-6">
+                    <h4 class="font-black mb-4 uppercase text-xs text-slate-400">Desglose Fiscal Estimado</h4>
+                    <div id="fiscal-detail" class="space-y-3 font-bold text-sm"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISTAS SIMPLES -->
+        <section id="tab-extra" class="tab-content">
+            <div class="card p-6 max-w-lg mx-auto"><form onsubmit="saveExtra(event)" class="space-y-4">
+                <label class="input-label">Fecha</label><input type="date" id="ext-fecha" required>
+                <label class="input-label">Concepto</label><input type="text" id="ext-concepto" placeholder="Ej: Venta materiales sobrantes" required>
+                <label class="input-label">Monto ($)</label><input type="text" id="ext-monto" placeholder="0" oninput="formatInput(this)" required>
+                <label class="input-label">Régimen</label><select id="ext-regimen"><option value="negro">Negro</option><option value="monotributo">Monotributo</option><option value="srl">SRL</option></select>
+                <button type="submit" class="btn-primary w-full">Registrar Extra</button></form></div>
+            <div class="mt-10 pt-6 border-t border-gray-200">
+                <h3 class="text-lg font-bold mb-4 text-green-800">Historial de Extras</h3>
+    	    </div>
+            <div id="lista-extras-local" class="space-y-3 mt-4"></div>
+        </section>
+
+        <section id="tab-gastos" class="tab-content">
+            <div class="card p-6 max-w-lg mx-auto"><form onsubmit="saveGasto(event)" class="space-y-4">
+                <label class="input-label">Fecha</label><input type="date" id="gas-fecha" required>
+                <label class="input-label">Proveedor / Detalle</label><input type="text" id="gas-detalle" placeholder="Nombre local" required>
+                <label class="input-label">Categoría</label><select id="gas-cat" class="cfg-gastos-sync"></select>
+                <label class="input-label">Monto ($)</label><input type="text" id="gas-monto" placeholder="0" oninput="formatInput(this)" required>
+                <button type="submit" class="btn-primary w-full">Registrar Gasto</button></form></div>
+	    <div class="mt-10 pt-6 border-t border-gray-200">
+		<h3 class="text-lg font-bold mb-4 text-red-800">Historial de Gastos</h3>
+		<div id="lista-gastos-local" class="space-y-3 mt-4"></div>
+	    </div>
+        </section>
+
+        <section id="tab-ahorro" class="tab-content">
+            <div class="card p-6 max-w-lg mx-auto"><form onsubmit="saveAhorro(event)" class="space-y-4">
+                <label class="input-label">Fecha</label><input type="date" id="aho-fecha" required>
+                <label class="input-label">Tipo</label><select id="aho-tipo"><option value="inversion">Inversión / Ingreso</option><option value="retiro">Retiro / Egreso</option></select>
+                <label class="input-label">Canal</label><select id="aho-canal" class="cfg-ahorro-sync"></select>
+                <label class="input-label">Monto ($)</label><input type="text" id="aho-monto" placeholder="0" oninput="formatInput(this)" required>
+                <button type="submit" class="btn-primary w-full">Registrar Movimiento</button></form></div>
+            <div id="lista-ahorro-local" class="space-y-3 mt-4"></div>
+        </section>
+
+        <section id="tab-config" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card p-6">
+                    <h3 class="font-black mb-4 uppercase text-xs text-slate-400">Tasas Impositivas</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="input-label">IVA (%)</label><input type="number" step="0.1" id="cfg-iva" onchange="updateCfg()"></div>
+                        <div><label class="input-label">IIBB (%)</label><input type="number" step="0.1" id="cfg-iibb" onchange="updateCfg()"></div>
+                        <div><label class="input-label">Ganancias (%)</label><input type="number" step="0.1" id="cfg-ganancias" onchange="updateCfg()"></div>
+                        <div><label class="input-label">Monotributo Fijo ($)</label><input type="text" id="cfg-fijo" oninput="formatInput(this)" onchange="updateCfg()"></div>
+                    </div>
+                    <div class="mt-8 pt-6 border-t space-y-3">
+                        <button onclick="exportData()" class="w-full bg-slate-800 text-white p-4 rounded-xl font-black text-xs uppercase tracking-widest">Descargar Respaldo (JSON)</button>
+                        <label class="w-full bg-slate-100 p-4 rounded-xl font-black text-xs uppercase tracking-widest flex justify-center cursor-pointer border-2 border-dashed border-slate-300">
+                            Cargar Respaldo <input type="file" class="hidden" onchange="importData(event)">
+                        </label>
+                    </div>
+                </div>
+                <div class="card p-6">
+                    <h3 class="font-black mb-4 uppercase text-xs text-slate-400">Administrar Listas</h3>
+                    <div class="space-y-8">
+                        <div>
+                            <label class="input-label">Rubros de Trabajo</label>
+                            <div class="flex gap-2"><input type="text" id="new-rubro" placeholder="Nuevo..."><button onclick="addList('categorias', 'new-rubro')" class="bg-blue-600 text-white px-4 rounded-xl font-black">+</button></div>
+                            <div id="list-rubros" class="flex flex-wrap gap-2 mt-3"></div>
+                        </div>
+                        <div>
+                            <label class="input-label">Categorías de Gastos</label>
+                            <div class="flex gap-2"><input type="text" id="new-gasto" placeholder="Nuevo..."><button onclick="addList('catGastos', 'new-gasto')" class="bg-blue-600 text-white px-4 rounded-xl font-black">+</button></div>
+                            <div id="list-gastos" class="flex flex-wrap gap-2 mt-3"></div>
+                        </div>
+                        <div>
+                            <label class="input-label">Canales de Ahorro</label>
+                            <div class="flex gap-2"><input type="text" id="new-ahorro" placeholder="Nuevo..."><button onclick="addList('catAhorro', 'new-ahorro')" class="bg-blue-600 text-white px-4 rounded-xl font-black">+</button></div>
+                            <div id="list-ahorro" class="flex flex-wrap gap-2 mt-3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // --- MOTOR DE DATOS (window.state) ---
+        const DB_KEY = 'balance_pro_v1_2_1_master';
+        let state = JSON.parse(localStorage.getItem(DB_KEY)) || {
+            viewMode: "month",
+            tasas: { iva: 21.0, iibb: 3.5, ganancias: 15.0, fijoMono: 45000 },
+            categorias: ["ELECTRICIDAD", "PINTURA", "REFORMAS"],
+            catGastos: ["MATERIALES", "HERRAMIENTAS", "VIATICOS", "PERSONALES"],
+            catAhorro: ["EFECTIVO", "BANCO", "DOLARES", "MERCADO PAGO"],
+            ingresos: [], extra: [], gastos: [], ahorro: []
+        };
+
+        let cobrosTemp = [];
+        let myChart = null;
+
+        const save = () => { localStorage.setItem(DB_KEY, JSON.stringify(state)); render(); };
+        const unformat = (s) => typeof s === 'string' ? (Number(s.replace(/[^0-9]/g, '')) || 0) : (s || 0);
+        const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+
+        // --- UTILIDADES ---
+        function formatInput(el) {
+            let v = unformat(el.value);
+            el.value = v === 0 ? '' : v.toLocaleString('es-AR');
+        }
+
+        function setViewMode(m) {
+            state.viewMode = m;
+            document.getElementById('v-month').className = m === 'month' ? 'px-4 py-1.5 rounded-lg font-bold text-xs transition bg-white shadow-sm' : 'px-4 py-1.5 rounded-lg font-bold text-xs transition text-slate-500';
+            document.getElementById('v-year').className = m === 'year' ? 'px-4 py-1.5 rounded-lg font-bold text-xs transition bg-white shadow-sm' : 'px-4 py-1.5 rounded-lg font-bold text-xs transition text-slate-500';
+            save();
+        }
+
+        function showTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.currentTarget.classList.add('active');
+            
+            const titles = {
+                'tab-ingresos': 'Registro de Trabajos',
+                'tab-extra': 'Ingresos Extra',
+                'tab-gastos': 'Gastos y Compras',
+                'tab-deudas': 'Caja / Cuentas Corrientes',
+                'tab-ahorro': 'Control de Ahorros',
+                'tab-balance': 'Balance Financiero',
+                'tab-config': 'Configuración del Sistema'
+            };
+            document.getElementById('view-title').innerText = titles[id] || 'Balance Pro';
+            if(id === 'tab-balance') initChart();
+            render();
+        }
+
+        // --- LÓGICA DE TRABAJOS E INGRESOS ---
+        function togglePagoInmediato() {
+            const isChecked = document.getElementById('chk-pago-momento').checked;
+            const panel = document.getElementById('panel-plan-config');
+            const bruto = unformat(document.getElementById('ing-bruto').value);
+            
+            if(isChecked) {
+                panel.style.opacity = '0.3';
+                panel.style.pointerEvents = 'none';
+                document.getElementById('ing-adelanto').value = bruto.toLocaleString('es-AR');
+                cobrosTemp = [];
+            } else {
+                panel.style.opacity = '1';
+                panel.style.pointerEvents = 'auto';
+                document.getElementById('ing-adelanto').value = '';
+            }
+            updateSaldo();
+            renderCobrosTemp();
+        }
+
+        function generarPlan() {
+            const bruto = unformat(document.getElementById('ing-bruto').value);
+            const adelanto = unformat(document.getElementById('ing-adelanto').value);
+            const cant = parseInt(document.getElementById('gen-cant').value) || 1;
+            const tipo = document.getElementById('gen-tipo').value;
+            const fechaRef = document.getElementById('gen-fecha-inicio').value || document.getElementById('ing-fecha').value;
+            
+            const saldo = bruto - adelanto;
+            if(saldo <= 0) return;
+            
+            const cuotaBase = Math.floor(saldo / cant);
+            cobrosTemp = [];
+            
+            for(let i=0; i<cant; i++) {
+                let d = new Date(fechaRef + "T12:00:00");
+                d.setMonth(d.getMonth() + i); // Lógica de meses subsiguientes
+                
+                cobrosTemp.push({
+                    id: Date.now() + i,
+                    tipo: tipo,
+                    monto: (i === cant - 1) ? saldo - (cuotaBase * (cant - 1)) : cuotaBase,
+                    fecha: d.toISOString().split('T')[0],
+                    estado: 'pendiente',
+                    numCheque: ''
+                });
+            }
+            renderCobrosTemp();
+        }
+
+        function renderCobrosTemp() {
+            const container = document.getElementById('lista-cobros-temp');
+            container.innerHTML = cobrosTemp.map((c, idx) => `
+                <div class="flex flex-wrap gap-2 items-center bg-white p-2 rounded-xl border border-blue-100 shadow-sm">
+                    <input type="date" value="${c.fecha}" onchange="cobrosTemp[${idx}].fecha = this.value" class="text-[10px] p-1 w-28 border-none font-bold">
+                    <select onchange="cobrosTemp[${idx}].tipo = this.value; renderCobrosTemp();" class="text-[10px] p-1 w-24 border-none font-bold">
+                        <option value="transferencia" ${c.tipo==='transferencia'?'selected':''}>Transf.</option>
+                        <option value="cheque" ${c.tipo==='cheque'?'selected':''}>Cheque</option>
+                        <option value="efectivo" ${c.tipo==='efectivo'?'selected':''}>Efectivo</option>
+                    </select>
+                    ${c.tipo === 'cheque' ? `<input type="text" placeholder="N° Cheque" value="${c.numCheque}" oninput="cobrosTemp[${idx}].numCheque=this.value" class="text-[10px] p-1 w-24 border-b">` : ''}
+                    <input type="text" value="${c.monto.toLocaleString('es-AR')}" oninput="cobrosTemp[${idx}].monto=unformat(this.value); formatInput(this); updateSaldo();" class="text-[10px] p-1 font-black w-24 text-right text-blue-700">
+                    <button type="button" onclick="cobrosTemp.splice(${idx},1); renderCobrosTemp(); updateSaldo();" class="text-red-400 font-black px-2 hover:text-red-600">×</button>
+                </div>
+            `).join('');
+            updateSaldo();
+        }
+
+        function updateSaldo() {
+            const bruto = unformat(document.getElementById('ing-bruto').value);
+            const adelanto = unformat(document.getElementById('ing-adelanto').value);
+            const sumaCuotas = cobrosTemp.reduce((acc, c) => acc + c.monto, 0);
+            const diff = bruto - (adelanto + sumaCuotas);
+            const msg = document.getElementById('validator-msg');
+            const btn = document.getElementById('btn-save-trabajo');
+            
+            if(bruto === 0) { msg.innerText = ""; return; }
+            if(diff === 0) {
+                msg.className = "text-[10px] font-black px-4 py-2 rounded-full bg-emerald-100 text-emerald-700";
+                msg.innerText = "✓ MONTO CUADRADO";
+                btn.disabled = false;
+            } else {
+                msg.className = "text-[10px] font-black px-4 py-2 rounded-full bg-rose-100 text-rose-700";
+                msg.innerText = diff > 0 ? `FALTAN: ${money.format(diff)}` : `SOBRAN: ${money.format(Math.abs(diff))}`;
+                btn.disabled = true;
+            }
+        }
+
+        function saveIngreso(e) {
+            e.preventDefault();
+            const nuevo = {
+                id: Date.now(),
+                f: document.getElementById('ing-fecha').value,
+                c: document.getElementById('ing-cliente').value,
+                t: document.getElementById('ing-rubro').value,
+                m: unformat(document.getElementById('ing-bruto').value),
+                g: unformat(document.getElementById('ing-materiales').value),
+                reg: document.getElementById('ing-regimen').value,
+                pago_inmediato: document.getElementById('chk-pago-momento').checked,
+                pago_contado_inicial: unformat(document.getElementById('ing-adelanto').value),
+                estado_deuda: 'pendiente',
+                cobros_detallados: [...cobrosTemp]
+            };
+            if(nuevo.pago_contado_inicial >= nuevo.m) nuevo.estado_deuda = 'saldada';
+            state.ingresos.push(nuevo);
+            cobrosTemp = [];
+            e.target.reset();
+            document.getElementById('lista-cobros-temp').innerHTML = '';
+            document.getElementById('chk-pago-momento').checked = false;
+            togglePagoInmediato();
+            save();
+        }
+
+        // --- CAJA Y CC (ESTADOS Y REVERSIÓN) ---
+        function toggleCobroSaldado(ingId, cobId) {
+            const ing = state.ingresos.find(i => i.id === ingId);
+            const cob = ing.cobros_detallados.find(c => c.id === cobId);
+            
+            if(cob.estado === 'pendiente') {
+                cob.estado = 'saldada';
+                cob.fecha_saldado = new Date().toISOString().split('T')[0];
+            } else {
+                cob.estado = 'pendiente';
+                delete cob.fecha_saldado;
+            }
+            
+            const todosSaldados = ing.cobros_detallados.every(c => c.estado === 'saldada');
+            ing.estado_deuda = todosSaldados ? 'saldada' : 'parcialmente saldada';
+            save();
+        }
+
+        function updateCobroInfo(ingId, cobId, field, val) {
+            const ing = state.ingresos.find(i => i.id === ingId);
+            const cob = ing.cobros_detallados.find(c => c.id === cobId);
+            cob[field] = val;
+            save();
+        }
+
+        // --- RENDERIZADO GENERAL ---
+        function render() {
+            // Sincronizar listas Config
+            const sync = (cls, arr) => {
+                document.querySelectorAll('.'+cls).forEach(sel => {
+                    const current = sel.value;
+                    sel.innerHTML = arr.map(v => `<option value="${v}">${v}</option>`).join('');
+                    if(arr.includes(current)) sel.value = current;
+                });
+            };
+            sync('cfg-rubros-sync', state.categorias);
+            sync('cfg-gastos-sync', state.catGastos);
+            sync('cfg-ahorro-sync', state.catAhorro);
+
+            // Tags Config
+            const renderTags = (id, arr, key) => {
+                document.getElementById(id).innerHTML = arr.map(v => `
+                    <span class="bg-slate-100 px-3 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-2 border border-slate-200">
+                        ${v} <button onclick="removeItem('${key}', '${v}')" class="text-red-500 font-bold hover:scale-125 transition">×</button>
+                    </span>
+                `).join('');
+            };
+            renderTags('list-rubros', state.categorias, 'categorias');
+            renderTags('list-gastos', state.catGastos, 'catGastos');
+            renderTags('list-ahorro', state.catAhorro, 'catAhorro');
+
+            // Inputs Config Tasas
+            document.getElementById('cfg-iva').value = state.tasas.iva;
+            document.getElementById('cfg-iibb').value = state.tasas.iibb;
+            document.getElementById('cfg-ganancias').value = state.tasas.ganancias;
+            document.getElementById('cfg-fijo').value = state.tasas.fijoMono.toLocaleString('es-AR');
+
+            // Render Deudas Pendientes
+            let pendientesHTML = "";
+            state.ingresos.filter(i => i.estado_deuda !== 'saldada').forEach(i => {
+                const pend = i.cobros_detallados.filter(c => c.estado === 'pendiente');
+                if(pend.length > 0) {
+                    pendientesHTML += `
+                    <div class="card p-4 border-l-4 border-orange-500 shadow-md">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-black text-xs uppercase text-slate-800">${i.c}</h4>
+                                <p class="text-[9px] font-bold text-slate-400">TRABAJO: ${i.f} | ${i.t}</p>
+                            </div>
+                            <span class="bg-orange-50 text-orange-600 px-2 py-0.5 rounded text-[9px] font-black">PENDIENTE</span>
+                        </div>
+                        <div class="space-y-2">
+                            ${pend.map(c => `
+                                <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                    <div class="flex-1">
+                                        <div class="text-[10px] font-black">${c.tipo.toUpperCase()} ${c.numCheque ? '#' + c.numCheque : ''}</div>
+                                        <div class="text-[9px] font-bold text-slate-400">Vence: ${c.fecha}</div>
+                                    </div>
+                                    <div class="text-right mr-2">
+                                        <div class="text-[10px] font-black text-blue-700">${money.format(c.monto)}</div>
+                                    </div>
+                                    <button onclick="toggleCobroSaldado(${i.id}, ${c.id})" class="bg-emerald-500 text-white font-black text-[9px] px-3 py-2 rounded-lg hover:bg-emerald-600">SALDAR</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+                }
+            });
+            document.getElementById('contenedor-pendientes').innerHTML = pendientesHTML || '<p class="text-xs font-bold text-slate-400 p-8 text-center bg-slate-50 rounded-2xl border-2 border-dashed">No hay cobros pendientes</p>';
+
+            // Historial de Cobros Recibidos
+            let historialHTML = "";
+            state.ingresos.forEach(i => {
+                i.cobros_detallados.forEach(c => {
+                    if(c.estado === 'saldada') {
+                        historialHTML += `
+                        <tr class="border-b text-[11px] hover:bg-slate-50 transition">
+                            <td class="p-4 font-bold text-slate-400">${c.fecha_saldado || i.f}</td>
+                            <td class="p-4">
+                                <div class="font-black uppercase">${i.c}</div>
+                                <div class="text-[9px] text-slate-400">${i.t}</div>
+                            </td>
+                            <td class="p-4">
+                                <span class="bg-slate-100 px-2 py-0.5 rounded font-black text-slate-600">${c.tipo.toUpperCase()}</span>
+                            </td>
+                            <td class="p-4">
+                                <input type="text" value="${c.numCheque || ''}" onchange="updateCobroInfo(${i.id}, ${c.id}, 'numCheque', this.value)" class="w-24 p-1 border-none bg-transparent hover:bg-white focus:bg-white rounded transition" placeholder="N° cheque...">
+                            </td>
+                            <td class="p-4 text-right font-black text-emerald-600">${money.format(c.monto)}</td>
+                            <td class="p-4 text-center">
+                                <button onclick="toggleCobroSaldado(${i.id}, ${c.id})" class="text-[9px] font-black text-rose-500 border border-rose-200 px-2 py-1 rounded-lg hover:bg-rose-50">REVERTIR</button>
+                            </td>
+                        </tr>`;
+                    }
+                });
+            });
+            document.getElementById('body-historial-cobros').innerHTML = historialHTML;
+            updateKPIs();
+            function renderHistorialLocal() {
+                const configuracion = [
+                    { idContenedor: 'lista-ingresos-local', data: state.ingresos, color: 'blue', prop: 'c', tipo: 'ingresos' },
+                    { idContenedor: 'lista-extras-local', data: state.extra, color: 'green', prop: 'c', tipo: 'extra' },
+                    { idContenedor: 'lista-gastos-local', data: state.gastos, color: 'red', prop: 'd', tipo: 'gastos' },
+                    { idContenedor: 'lista-ahorro-local', data: state.ahorro, color: 'indigo', prop: 't', tipo: 'ahorro' }
+                ];
+
+                configuracion.forEach(conf => {
+                    const contenedor = document.getElementById(conf.idContenedor);
+                    if (!contenedor) return;
+
+                    const ultimos = [...conf.data].reverse().slice(0, 5);
+                    
+                    if (ultimos.length === 0) {
+                        contenedor.innerHTML = `<p class="text-[10px] font-bold text-slate-400 text-center py-4">No hay registros recientes</p>`;
+                        return;
+                    }
+
+                    contenedor.innerHTML = ultimos.map(item => `
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-${conf.color}-500 flex justify-between items-center mb-2">
+                            <div class="truncate pr-4">
+                                <p class="font-black text-slate-700 uppercase truncate text-[11px] mb-1">${item[conf.prop] || 'Sin detalle'}</p>
+                                <p class="text-[10px] text-slate-400 font-medium">${item.f} • ${money.format(item.m)}</p>
+                            </div>
+                            <button onclick="borrarDirecto('${conf.tipo}', ${item.id})" class="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    `).join('');
+                });
+            }
+
+            function borrarDirecto(tipo, id) {
+                if (!confirm("¿Deseas eliminar este registro de forma permanente?")) return;
+                
+                // Filtra el array según el tipo (ingresos, extra, gastos, ahorro)
+                state[tipo] = state[tipo].filter(item => item.id !== id);
+                
+                // Si es un ingreso, también debemos limpiar los cobros asociados en el historial de cobros
+                if (tipo === 'ingresos') {
+                    // Opcional: podrías filtrar cobros aquí si fuera necesario
+                }
+
+                save(); // Guarda en localStorage y llama a render()
+            }
+            renderHistorialLocal();
+        }
+        function borrarDirecto(tipo, id) {
+            if (!confirm("¿Deseas eliminar este registro de forma permanente?")) return;
+            state[tipo] = state[tipo].filter(item => item.id !== id);
+            save(); // Esto guarda en localStorage y llama a render(), que a su vez llama a renderHistorialLocal()
+        }
+
+        function updateKPIs() {
+            const today = new Date();
+            const cm = today.getMonth() + 1;
+            const cy = today.getFullYear();
+
+            const isMatch = (d) => {
+                if(!d) return false;
+                const [y, m] = d.split('-').map(Number);
+                return state.viewMode === 'month' ? (y === cy && m === cm) : (y === cy);
+            };
+
+            let cobrado = 0, gastos = 0, factSRL = 0, factMono = 0, matSRL = 0;
+
+            // Motor de Cobrado Real (Regla del Cheque v1.2.1)
+            state.ingresos.forEach(i => {
+                if(isMatch(i.f)) {
+                    cobrado += i.pago_contado_inicial;
+                    if(i.reg === 'srl') { factSRL += i.m; matSRL += i.g; }
+                    if(i.reg === 'monotributo') factMono += i.m;
+                }
+                
+                i.cobros_detallados.forEach(c => {
+                    if(c.estado === 'saldada' && isMatch(c.fecha_saldado)) {
+                        // REGLA DEL CHEQUE: Solo suma si hoy >= fecha acreditación
+                        if(c.tipo === 'cheque') {
+                            if(today >= new Date(c.fecha + "T12:00:00")) cobrado += c.monto;
+                        } else {
+                            cobrado += c.monto;
+                        }
+                    }
+                });
+            });
+
+            state.extra.filter(e => isMatch(e.f)).forEach(e => {
+                cobrado += e.m;
+                if(e.reg === 'srl') factSRL += e.m;
+                if(e.reg === 'monotributo') factMono += e.m;
+            });
+
+            gastos = state.gastos.filter(g => isMatch(g.f)).reduce((acc, val) => acc + val.m, 0);
+
+            // Motor Impositivo
+            const t = state.tasas;
+            const det = {
+                iva: factSRL * (t.iva / 100),
+                iibb: (factSRL + factMono) * (t.iibb / 100),
+                ganancias: Math.max(0, (factSRL - matSRL) * (t.ganancias / 100)),
+                fijo: t.fijoMono * (state.viewMode === 'year' ? 12 : 1)
+            };
+            const impTotal = det.iva + det.iibb + det.ganancias + det.fijo;
+
+            document.getElementById('kpi-cobrado').innerText = money.format(cobrado);
+            document.getElementById('kpi-gastos').innerText = money.format(gastos);
+            document.getElementById('kpi-impuestos').innerText = money.format(impTotal);
+            document.getElementById('kpi-utilidad').innerText = money.format(cobrado - gastos - impTotal);
+
+            document.getElementById('fiscal-detail').innerHTML = `
+                <div class="flex justify-between p-2 bg-slate-50 rounded-lg"><span>IVA Est. (SRL)</span><span>${money.format(det.iva)}</span></div>
+                <div class="flex justify-between p-2 bg-slate-50 rounded-lg"><span>IIBB Est.</span><span>${money.format(det.iibb)}</span></div>
+                <div class="flex justify-between p-2 bg-slate-50 rounded-lg"><span>Ganancias Est.</span><span>${money.format(det.ganancias)}</span></div>
+                <div class="flex justify-between p-2 bg-blue-50 text-blue-700 rounded-lg"><span>Fijo Monotributo</span><span>${money.format(det.fijo)}</span></div>
+            `;
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            if(myChart) myChart.destroy();
+            
+            const u = Math.max(0, unformat(document.getElementById('kpi-utilidad').innerText));
+            const g = unformat(document.getElementById('kpi-gastos').innerText);
+            const i = unformat(document.getElementById('kpi-impuestos').innerText);
+            
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Utilidad', 'Gastos', 'Impuestos'],
+                    datasets: [{
+                        data: [u, g, i],
+                        backgroundColor: ['#2563eb', '#ef4444', '#f97316'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    cutout: '70%',
+                    plugins: { legend: { position: 'bottom', labels: { font: { weight: 'bold', size: 10 } } } }
+                }
+            });
+        }
+
+        // --- FUNCIONES DE PERSISTENCIA Y CONFIG ---
+        function updateCfg() {
+            state.tasas.iva = Number(document.getElementById('cfg-iva').value);
+            state.tasas.iibb = Number(document.getElementById('cfg-iibb').value);
+            state.tasas.ganancias = Number(document.getElementById('cfg-ganancias').value);
+            state.tasas.fijoMono = unformat(document.getElementById('cfg-fijo').value);
+            save();
+        }
+
+        function addList(key, inputId) {
+            const v = document.getElementById(inputId).value.toUpperCase().trim();
+            if(v && !state[key].includes(v)) {
+                state[key].push(v);
+                document.getElementById(inputId).value = '';
+                save();
+            }
+        }
+
+        function removeItem(key, val) {
+            state[key] = state[key].filter(x => x !== val);
+            save();
+        }
+
+        function exportData() {
+            const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `BALANCE_PRO_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        function importData(e) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const loaded = JSON.parse(ev.target.result);
+                    // Validación mínima de estructura
+                    if(loaded.ingresos && loaded.tasas) {
+                        state = loaded;
+                        save();
+                        location.reload();
+                    } else { throw new Error(); }
+                } catch(err) { alert("Archivo de respaldo inválido o dañado."); }
+            };
+            reader.readAsText(e.target.files[0]);
+        }
+
+        // --- HANDLERS VISTAS SECUNDARIAS ---
+        function saveExtra(e) {
+            e.preventDefault();
+            state.extra.push({
+                id: Date.now(),
+                f: document.getElementById('ext-fecha').value,
+                c: document.getElementById('ext-concepto').value,
+                m: unformat(document.getElementById('ext-monto').value),
+                reg: document.getElementById('ext-regimen').value
+            });
+            e.target.reset();
+            save();
+        }
+
+        function saveGasto(e) {
+            e.preventDefault();
+            state.gastos.push({
+                id: Date.now(),
+                f: document.getElementById('gas-fecha').value,
+                d: document.getElementById('gas-detalle').value,
+                t: document.getElementById('gas-cat').value,
+                m: unformat(document.getElementById('gas-monto').value)
+            });
+            e.target.reset();
+            save();
+        }
+
+        function saveAhorro(e) {
+            e.preventDefault();
+            state.ahorro.push({
+                id: Date.now(),
+                f: document.getElementById('aho-fecha').value,
+                tipo: document.getElementById('aho-tipo').value,
+                t: document.getElementById('aho-canal').value,
+                m: unformat(document.getElementById('aho-monto').value)
+            });
+            e.target.reset();
+            save();
+        }
+        function renderHistorialLocal() {
+            const configuracion = [
+                { id: 'tab-ingresos', data: state.ingresos, lista: 'list-ing', color: 'blue', prop: 'c' },
+                { id: 'tab-extras', data: state.extra, lista: 'list-ext', color: 'green', prop: 'c' },
+                { id: 'tab-gastos', data: state.gastos, lista: 'list-gas', color: 'red', prop: 'd' }
+            ];
+
+            configuracion.forEach(conf => {
+                const section = document.getElementById(conf.id);
+                if (!section) return;
+
+                // Crear el contenedor si no existe
+                let listaDiv = document.getElementById(conf.lista);
+                if (!listaDiv) {
+                    const contenedor = document.createElement('div');
+                    contenedor.className = "mt-8 pt-6 border-t border-gray-200";
+                    contenedor.innerHTML = `<h3 class="text-sm font-bold mb-4 text-gray-500 uppercase">Historial Reciente</h3><div id="${conf.lista}" class="space-y-3"></div>`;
+                    section.appendChild(contenedor);
+                    listaDiv = document.getElementById(conf.lista);
+                }
+
+                // Dibujar los últimos 5 registros
+                const ultimos = [...conf.data].reverse().slice(0, 5);
+                listaDiv.innerHTML = ultimos.map(item => `
+                    <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-${conf.color}-500 flex justify-between items-center">
+                        <div class="truncate pr-4">
+                            <p class="font-bold text-gray-800 uppercase truncate text-xs">${item[conf.prop]}</p>
+                            <p class="text-[10px] text-gray-400">${item.f} | ${money.format(item.m)}</p>
+                        </div>
+                        <button onclick="borrarDirecto('${conf.id === 'tab-extras' ? 'extra' : conf.id.replace('tab-', '')}', ${item.id})" class="p-2 text-red-500 bg-red-50 rounded-lg">✕</button>
+                    </div>
+                `).join('');
+            });
+        }
+
+        function borrarDirecto(tipo, id) {
+            if (!confirm("¿Eliminar este registro?")) return;
+            state[tipo] = state[tipo].filter(i => i.id !== id);
+            save();
+            render();
+        }
+
+        window.onload = () => {
+            const hoy = new Date().toISOString().split('T')[0];
+            ['ing-fecha','ext-fecha','gas-fecha','aho-fecha','gen-fecha-inicio'].forEach(id => {
+                if(document.getElementById(id)) document.getElementById(id).value = hoy;
+            });
+            render();
+        };
+        
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('PWA lista para usar'))
+                .catch(err => console.log('Error al registrar PWA', err));
+            });
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "Balance Pro Master SFA",
+  "short_name": "BalancePro",
+  "start_url": "ADMINISTRACION_GENERAL_1.4.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/583/583985.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
